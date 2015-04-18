@@ -1,0 +1,25 @@
+{
+  "author": "Louis Minsky <louis@louisminsky.com>",
+  "name": "LogMeIn Central Reports",
+  "description": "A node.js LogMeIn Central report generating tool.",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lominsky/LogMeIn-Central-Reporting-API"
+  },
+  "bugs": {
+    "url": "https://github.com/lominsky/LogMeIn-Central-Reporting-API/issues"
+  },
+  "keywords": [
+    "logmein"
+  ],
+  "main": "./index.js",
+  "engines": {
+    "node": ">=0.8"
+  },
+  "dependencies": {
+    "fs": "*",
+	"request": "*",
+  },
+  { "license" : "GPL-3.0" }
+}
