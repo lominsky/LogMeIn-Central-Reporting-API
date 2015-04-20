@@ -3,48 +3,20 @@ var psk = '1234567890qwertyuiopasdfghjklzxcvbnm';
 
 var request = require('request');
 var fs = require('fs');
-var d = require('./data.json')
 
 var baseURL = 'https://secure.logmein.com/public-api/v1/';
 
-var dBody = "";
-var t = d.token;
-var h = d.hosts;
-var dBody = '{ \"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + +'\"}' + t.token + '\"}, \"hosts\": [' + h + '] }';
+var hosts = {"id": [], "name": []};
+var hardwareToken;
+var systemToken;
 
-var hosts = [];
-var hostsUpdated = false;
-var hardwareToken = 'token';
+var hardwareReport;
+var systemReport;
 
 getHosts();
 
-function getToken() {
-	var exp = new Date();
-	exp.setFullYear(t.expires.substring(0,4));
-	exp.setMonth(t.expires.substring(5,7));
-	exp.setDate(t.expires.substring(8,10));
-	exp.setHours(t.expires.substring(11,13));
-	exp.setMinutes(t.expires.substring(14,16));
-	exp.setSeconds(t.expires.substring(17,19));
-	
-	checkExpiration(exp);
-}
-
-function checkExpiration(exp) {
-	console.log('Checking token expiration against current time...');
-	var currentTime = new Date();
-	var timeDiff = (exp.getTime()-currentTime.getTime());
-	
-	if(timeDiff > 0) {
-		console.log('Valid Token');
-		hardwareToken = t.token;
-		generateReport();
-	} else {
-		retrieveToken();
-	}
-}
-
 function getHosts() {
+	console.log('Getting Current Hosts...');
 	var hosts = {
 	  url: baseURL + 'hosts',
 	  headers: {
@@ -59,44 +31,25 @@ function getHosts() {
 		parseHosts(tempHosts.hosts);
 	  }
 	  else if(response.statusCode == 429) {
-		  console.log('Cannot retrieve host list due to high request volume, using cached host information');
-		  getToken();
+		  console.log('Cannot retrieve host list due to high request volume, please try again in a few minutes.');
 	  }
 	  else
-		  console.log('Error in function \'getHosts\', Status Code ' + response.statusCode);
+		  console.log('Error in function \'getHosts\'. Status Code ' + response.statusCode);
 	});
 }
 
 function parseHosts(tempHosts) {
+	console.log('Parsing Host IDs and Names...');
 	var hostCount = tempHosts.length;
 	for(var i = 0; i < hostCount; i++) {
-		hosts.push(tempHosts[i].id);
+		hosts.id.push(tempHosts[i].id);
+		hosts.name.push(tempHosts[i].description);
 	}
-	compareHosts();
+	retrieveHardwareToken();
 }
 
-function compareHosts() {
-	console.log('Comparing Hosts Against Cache...');
-	if((hosts.length == d.hosts.length) && hosts.every(function(element, index) {
-		return element === d.hosts[index]; 
-	})) {
-		console.log('Current Hosts Matches Cache');
-		getToken();
-	}
-	else {
-		dBody = '{ \"token\": {\"expires\":\"' + d.token.expires + '\","token\":\"' + d.token.token + '\"}, \"hosts\": [' + hosts + '] }';
-		fs.writeFile('./data.json', dBody, function(err) {
-			if(err) {
-				return console.log('Error Updating Hosts');
-			}
-			console.log('Hosts Updated');
-			retrieveToken();
-		});
-	}
-}
-
-function retrieveToken() {
-	console.log('Retrieving New Token...');
+function retrieveHardwareToken() {
+	console.log('Retrieving New Hardware Token...');
 	var hardware = {
 	  url: baseURL + 'inventory/hardware/reports',
 	  headers: {
@@ -104,33 +57,26 @@ function retrieveToken() {
 		'Accept': 'application/JSON; charset=utf-8',
 		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
 	  },
-	  body: '{\"hostIds\": [' + hosts + ']}'
+	  body: '{\"hostIds\": [' + hosts.id + ']}'
 	};
 	
 	request.post(hardware, function (error, response, body) {
 	  	if(response.statusCode == 201 && !error) {
-			hardwareToken = JSON.parse(body).token;
-			dBody = '{ \"token\": ' + body + ', \"hosts\": [' + hosts + '] }';
-			fs.writeFile('./data.json', dBody, function(err) {
-				if(err) {
-					
-					return console.log('Error Saving Token');
-				}
-				console.log('Token Updated');
-				generateReport();
-			});
+			hardwareToken = JSON.parse(body);
+			console.log('Hardware Report Token Retrieved');
+			generateHardwareReport();
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate new token due to high request volume. Wait a few minutes and try again');
+			console.log('Cannot generate new hardware token due to high request volume. Wait a few minutes and try again');
 		} else
-			console.log('Error in function \'retrieveToken\', Status Code: ' + response.statusCode);
+			console.log('Error in function \'retrieveHardwareToken\', Status Code: ' + response.statusCode);
 	});
 }
 
-function generateReport() {
+function generateHardwareReport() {
 	console.log('Generating Hardware Report...');
-	console.log('Hardware Toke is.................' + hardwareToken);
+	console.log('Hardware Token is: ' + hardwareToken.token);
 	var hardware = {
-	  url: baseURL + 'inventory/hardware/reports/' + hardwareToken,
+	  url: baseURL + 'inventory/hardware/reports/' + hardwareToken.token,
 	  headers: {
 		'Accept': 'application/JSON; charset=utf-8',
 		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
@@ -139,14 +85,68 @@ function generateReport() {
 	
 	request.get(hardware, function (error, response, body) {
 	  	if(response.statusCode == 200 && !error) {
-			fs.writeFile('./hardwareReport.json', body, function(err) {
-				if(err) {
-					return console.log('Error Saving Hardware Report');
-				}
-			});
+			hardwareReport = JSON.parse(body);
+			console.log('Hardware Report Stored');
+			//console.log(hardwareReport);
+			retrieveSystemToken();
 		} else if (response.statusCode == 429) {
 			console.log('Cannot generate hardware report due to high request volume. Wait a few minutes and try again');
 		} else
-			console.log('Error in function \'generateReport\', Status Code: ' + response.statusCode);
+			console.log('Error in function \'generateHardwareReport\', Status Code: ' + response.statusCode);
 	});
+}
+
+function retrieveSystemToken() {
+	console.log('Retrieving New System Token...');
+	var system = {
+	  url: baseURL + 'inventory/system/reports',
+	  headers: {
+		'Content-type': 'application/JSON; charset=utf-8',
+		'Accept': 'application/JSON; charset=utf-8',
+		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
+	  },
+	  body: '{\"hostIds\": [' + hosts.id + ']}'
+	};
+	
+	request.post(system, function (error, response, body) {
+	  	if(response.statusCode == 201 && !error) {
+			systemToken = JSON.parse(body);
+			console.log('System Report Token Retrieved');
+			generateSystemReport();
+		} else if (response.statusCode == 429) {
+			console.log('Cannot generate new system token due to high request volume. Wait a few minutes and try again');
+		} else
+			console.log('Error in function \'retrieveSystemToken\', Status Code: ' + response.statusCode);
+	});
+}
+
+function generateSystemReport() {
+	console.log('Generating System Report...');
+	console.log('System Token is: ' + systemToken.token);
+	var system = {
+	  url: baseURL + 'inventory/system/reports/' + systemToken.token,
+	  headers: {
+		'Accept': 'application/JSON; charset=utf-8',
+		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
+	  }
+	};
+	
+	request.get(system, function (error, response, body) {
+	  	if(response.statusCode == 200 && !error) {
+			systemReport = JSON.parse(body);
+			console.log('System Report Stored');
+			printInformation();
+		} else if (response.statusCode == 429) {
+			console.log('Cannot generate system report due to high request volume. Wait a few minutes and try again');
+		} else
+			console.log('Error in function \'generateSystemReport\', Status Code: ' + response.statusCode);
+	});
+}
+
+function printInformation() {
+	var i = 0;
+	console.log(hosts.id[i]);
+	console.log(hosts.name[i]);
+	console.log(hardwareReport.hosts[hosts.id[0]]);
+	console.log(systemReport.hosts[hosts.id[0]]);
 }
