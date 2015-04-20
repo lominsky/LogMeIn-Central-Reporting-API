@@ -1,5 +1,5 @@
-var cid = '123456789';
-var psk = '1234567890qwertyuiopasdfghjklzxcvbnm';
+var cid = '123456798';
+var psk = '123456789qwertyuiopasdfghjklzxcvbnm';
 
 var request = require('request');
 var fs = require('fs');
@@ -8,13 +8,12 @@ var d = require('./data.json')
 var dBody = "";
 var t = d.token;
 var h = d.hosts;
-var dBody = '{\"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + +'\"}' + t.token + '\"}, \"hosts\": [' + h + '] }';
+var dBody = '{ \"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + +'\"}' + t.token + '\"}, \"hosts\": [' + h + '] }';
 
 var hosts = [];
 var hostsUpdated = false;
 
 getHosts();
-getToken();
 
 function getToken() {
 	var exp = new Date();
@@ -29,6 +28,7 @@ function getToken() {
 }
 
 function checkExpiration(exp) {
+	console.log('Checking token expiration against current time...');
 	var currentTime = new Date();
 	var timeDiff = (exp.getTime()-currentTime.getTime());
 	
@@ -53,7 +53,8 @@ function getHosts() {
 		parseHosts(tempHosts.hosts);
 	  }
 	  else if(response.statusCode == 429) {
-		  console.log('Cannot retrieve host list due to high volume, using cached host information');
+		  console.log('Cannot retrieve host list due to high request volume, using cached host information');
+		  getToken();
 	  }
 	  else
 		  console.log('Error in function \'getHosts\', Status Code ' + response.statusCode);
@@ -69,24 +70,27 @@ function parseHosts(tempHosts) {
 }
 
 function compareHosts() {
+	console.log('Comparing Hostlist Against Cache...');
 	if((hosts.length == d.hosts.length) && hosts.every(function(element, index) {
 		return element === d.hosts[index]; 
 	})) {
 		console.log('Current Hostlist Matches Cache');
+		getToken();
 	}
 	else {
-		dBody = '{\"token\": {\"expires\":\"' + d.token.expires + '\","token\":\"' + d.token.token + '\"}, \"hosts\": [' + hosts + '] }';
+		dBody = '{ \"token\": {\"expires\":\"' + d.token.expires + '\","token\":\"' + d.token.token + '\"}, \"hosts\": [' + hosts + '] }';
 		fs.writeFile('./data.json', dBody, function(err) {
 			if(err) {
-				return console.log('Error updated Data: Hosts');
+				return console.log('Error updating Data: Hosts');
 			}
-			return console.log('Data: Hosts Updated');
+			console.log('Hostlist Updated');
+			retrieveToken();
 		});
-		//retrieveToken();
 	}
 }
 
 function retrieveToken() {
+	console.log('Retrieving New Token...');
 	var hardware = {
 	  url: 'https://secure.logmein.com/public-api/v1/inventory/hardware/reports',
 	  headers: {
@@ -94,22 +98,22 @@ function retrieveToken() {
 		'Accept': 'application/JSON; charset=utf-8',
 		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
 	  },
-	  body: '{\"hostIds\": [' + d.hosts + ']}'
+	  body: '{\"hostIds\": [' + hosts + ']}'
 	};
-	
 	
 	request.post(hardware, function (error, response, body) {
 	  	if(response.statusCode == 201 && !error) {
-				dBody = '{\"token\": ' + body + ', \"hosts\": [' + d.hosts + '] }';
+				dBody = '{ \"token\": ' + body + ', \"hosts\": [' + hosts + '] }';
 				fs.writeFile('./data.json', dBody, function(err) {
 					if(err) {
 						
 						return console.log('Error updated Data: Token');
 					}
-					return console.log('Data: Token Updated');
+					return console.log('Token Updated');
 				});
-		}
-		else
+		} else if (response.statusCode == 429) {
+			console.log('Cannot generate new token due to high request volume. Wait a few minutes and try again');
+		} else
 			console.log('Error in function \'retrieveToken\', Status Code: ' + response.statusCode);
-	})
+	});
 }
