@@ -1,8 +1,9 @@
-var cid = '1234567890';
-var psk = '1234567890qwertyuiopasdfghjklzxcvbnm';
+var cid = '123456789';
+var psk = '123456789';
 
 var request = require('request');
 var fs = require('fs');
+var readline = require('readline');
 
 var baseURL = 'https://secure.logmein.com/public-api/v1/';
 
@@ -10,8 +11,8 @@ var hosts = {"id": [], "name": []};
 var hardwareToken;
 var systemToken;
 
-var hardwareReport;
-var systemReport;
+var hardwareReports = [];
+var systemReports = [];
 
 getHosts();
 
@@ -31,7 +32,7 @@ function getHosts() {
 		parseHosts(tempHosts.hosts);
 	  }
 	  else if(response.statusCode == 429) {
-		  console.log('Cannot retrieve host list due to high request volume, please try again in a few minutes.');
+		  console.log('Cannot retrieve host list due to high request volume. Wait a minute and try again.');
 	  }
 	  else
 		  console.log('Error in function \'getHosts\'. Status Code ' + response.statusCode);
@@ -66,7 +67,7 @@ function retrieveHardwareToken() {
 			console.log('Hardware Report Token Retrieved');
 			generateHardwareReport();
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate new hardware token due to high request volume. Wait a few minutes and try again');
+			console.log('Cannot generate new hardware token due to high request volume. Wait a minute and try again');
 		} else
 			console.log('Error in function \'retrieveHardwareToken\', Status Code: ' + response.statusCode);
 	});
@@ -85,12 +86,12 @@ function generateHardwareReport() {
 	
 	request.get(hardware, function (error, response, body) {
 	  	if(response.statusCode == 200 && !error) {
-			hardwareReport = JSON.parse(body);
+			hardwareReports.push(JSON.parse(body));
 			console.log('Hardware Report Stored');
 			//console.log(hardwareReport);
 			retrieveSystemToken();
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate hardware report due to high request volume. Wait a few minutes and try again');
+			console.log('Cannot generate hardware report due to high request volume. Wait a minute and try again');
 		} else
 			console.log('Error in function \'generateHardwareReport\', Status Code: ' + response.statusCode);
 	});
@@ -114,7 +115,7 @@ function retrieveSystemToken() {
 			console.log('System Report Token Retrieved');
 			generateSystemReport();
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate new system token due to high request volume. Wait a few minutes and try again');
+			console.log('Cannot generate new system token due to high request volume. Wait a minute and try again');
 		} else
 			console.log('Error in function \'retrieveSystemToken\', Status Code: ' + response.statusCode);
 	});
@@ -133,20 +134,54 @@ function generateSystemReport() {
 	
 	request.get(system, function (error, response, body) {
 	  	if(response.statusCode == 200 && !error) {
-			systemReport = JSON.parse(body);
+			systemReports.push(JSON.parse(body));
 			console.log('System Report Stored');
-			printInformation();
+			//printInformation();
+			
+			//Get each additional 50 computers (still needs to be done for Hardware Reports
+			if(JSON.parse(body).report.token == null)
+				userInput();
+			else{
+				systemToken = JSON.parse(body).report;
+				generateSystemReport();
+			}
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate system report due to high request volume. Wait a few minutes and try again');
+			console.log('Cannot generate system report due to high request volume. Wait a minute and try again');
 		} else
 			console.log('Error in function \'generateSystemReport\', Status Code: ' + response.statusCode);
 	});
 }
 
-function printInformation() {
-	var i = 0;
-	console.log(hosts.id[i]);
-	console.log(hosts.name[i]);
-	console.log(hardwareReport.hosts[hosts.id[0]]);
-	console.log(systemReport.hosts[hosts.id[0]]);
+function userInput() {
+	var rl = readline.createInterface({
+	  input: process.stdin,
+	  output: process.stdout
+	});
+	
+	rl.question('Enter the computer name: ', function(compName) {
+		rl.close();
+		if(compName == 'exit' || compName == 'Exit')
+			return console.log('Program Exiting');
+		printInformation(compName);
+	});
+}
+
+function printInformation(compID) {
+	/*var index = -1;
+	for(var i = 0; i < hosts.id.length; i++) {
+		if(hosts.name[i].indexOf(compID) != -1) {
+			index = i;
+			break;
+		}
+	}
+	if(index == -1)
+		return userInput();*/
+	//var array = [77998031, '77998031', "77998031"];
+	console.log(parseInt(compID/50));
+	//console.log('Index: ' + compID);
+	//console.log('Host Info: ' + hosts.id[compID] + ', ' + hosts.name[compID]);
+	//console.log('Hardware Report: ' + hardwareReport[compID/50].hosts[hosts.id[compID]]);
+	console.log('System Report: ' + systemReports[parseInt(compID/50)].hosts[hosts.id[compID]].lastLogonUserName);
+
+	return userInput();
 }
