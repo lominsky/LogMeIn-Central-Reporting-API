@@ -10,7 +10,6 @@ var t = d.token;
 var h = d.hosts;
 var dBody = '{\"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + +'\"}' + t.token + '\"}, \"hosts\": [' + h + '] }';
 
-var tokenAuth;
 var hosts = [];
 var hostsUpdated = false;
 
@@ -18,16 +17,13 @@ getHosts();
 getToken();
 
 function getToken() {
-	tokenAuth = t.token;
-	var tokenExp = t.expires;
 	var exp = new Date();
-
-	exp.setFullYear(tokenExp.substring(0,4));
-	exp.setMonth(tokenExp.substring(5,7));
-	exp.setDate(tokenExp.substring(8,10));
-	exp.setHours(tokenExp.substring(11,13));
-	exp.setMinutes(tokenExp.substring(14,16));
-	exp.setSeconds(tokenExp.substring(17,19));
+	exp.setFullYear(t.expires.substring(0,4));
+	exp.setMonth(t.expires.substring(5,7));
+	exp.setDate(t.expires.substring(8,10));
+	exp.setHours(t.expires.substring(11,13));
+	exp.setMinutes(t.expires.substring(14,16));
+	exp.setSeconds(t.expires.substring(17,19));
 	
 	checkExpiration(exp);
 }
@@ -73,20 +69,20 @@ function parseHosts(tempHosts) {
 }
 
 function compareHosts() {
-	if((hosts.length == h.length) && hosts.every(function(element, index) {
-		return element === h[index]; 
+	if((hosts.length == d.hosts.length) && hosts.every(function(element, index) {
+		return element === d.hosts[index]; 
 	})) {
 		console.log('Current Hostlist Matches Cache');
 	}
 	else {
-		dBody = '{\"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + t.token + '\"}, \"hosts\": [' + hosts + '] }';
+		dBody = '{\"token\": {\"expires\":\"' + d.token.expires + '\","token\":\"' + d.token.token + '\"}, \"hosts\": [' + hosts + '] }';
 		fs.writeFile('./data.json', dBody, function(err) {
 			if(err) {
 				return console.log('Error updated Data: Hosts');
 			}
 			return console.log('Data: Hosts Updated');
 		});
-		retrieveToken();
+		//retrieveToken();
 	}
 }
 
@@ -98,13 +94,13 @@ function retrieveToken() {
 		'Accept': 'application/JSON; charset=utf-8',
 		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
 	  },
-	  body: '{\"hostIds\": [' + h + ']}'
+	  body: '{\"hostIds\": [' + d.hosts + ']}'
 	};
 	
 	
 	request.post(hardware, function (error, response, body) {
 	  	if(response.statusCode == 201 && !error) {
-				dBody = '{\"token\": ' + body + ', \"hosts\": [' + h + '] }';
+				dBody = '{\"token\": ' + body + ', \"hosts\": [' + d.hosts + '] }';
 				fs.writeFile('./data.json', dBody, function(err) {
 					if(err) {
 						
