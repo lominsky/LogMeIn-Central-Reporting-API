@@ -1,5 +1,5 @@
-var cid = null;
-var psk = null;
+var cid = '123456789';
+var psk = '1234567890qwertyuiopasdfghjklzxcvbnm';
 
 var request = require('request');
 var fs = require('fs');
@@ -20,7 +20,6 @@ getToken();
 function getToken() {
 	tokenAuth = t.token;
 	var tokenExp = t.expires;
-
 	var exp = new Date();
 
 	exp.setFullYear(tokenExp.substring(0,4));
@@ -80,7 +79,7 @@ function compareHosts() {
 		console.log('Current Hostlist Matches Cache');
 	}
 	else {
-		dBody = '{\"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + +'\"}' + t.token + ', \"hosts\": [' + hosts + '] }';
+		dBody = '{\"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + t.token + '\"}, \"hosts\": [' + hosts + '] }';
 		fs.writeFile('./data.json', dBody, function(err) {
 			if(err) {
 				return console.log('Error updated Data: Hosts');
@@ -99,8 +98,9 @@ function retrieveToken() {
 		'Accept': 'application/JSON; charset=utf-8',
 		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
 	  },
-	  body: '{\"hostIds\": ' + h + '}'
+	  body: '{\"hostIds\": [' + h + ']}'
 	};
+	
 	
 	request.post(hardware, function (error, response, body) {
 	  	if(response.statusCode == 201 && !error) {
