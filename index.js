@@ -1,9 +1,11 @@
-var cid = '123456798';
-var psk = '123456789qwertyuiopasdfghjklzxcvbnm';
+var cid = '1234567890';
+var psk = '1234567890qwertyuiopasdfghjklzxcvbnm';
 
 var request = require('request');
 var fs = require('fs');
 var d = require('./data.json')
+
+var baseURL = 'https://secure.logmein.com/public-api/v1/';
 
 var dBody = "";
 var t = d.token;
@@ -12,6 +14,7 @@ var dBody = '{ \"token\": {\"expires\":\"' + t.expires + '\","token\":\"' + +'\"
 
 var hosts = [];
 var hostsUpdated = false;
+var hardwareToken = 'token';
 
 getHosts();
 
@@ -32,15 +35,18 @@ function checkExpiration(exp) {
 	var currentTime = new Date();
 	var timeDiff = (exp.getTime()-currentTime.getTime());
 	
-	if(timeDiff > 0)
+	if(timeDiff > 0) {
 		console.log('Valid Token');
-	else
+		hardwareToken = t.token;
+		generateReport();
+	} else {
 		retrieveToken();
+	}
 }
 
 function getHosts() {
 	var hosts = {
-	  url: 'https://secure.logmein.com/public-api/v1/hosts',
+	  url: baseURL + 'hosts',
 	  headers: {
 		'User-Agent': 'request',
 		'Accept': 'application/JSON; charset=utf-8',
@@ -70,20 +76,20 @@ function parseHosts(tempHosts) {
 }
 
 function compareHosts() {
-	console.log('Comparing Hostlist Against Cache...');
+	console.log('Comparing Hosts Against Cache...');
 	if((hosts.length == d.hosts.length) && hosts.every(function(element, index) {
 		return element === d.hosts[index]; 
 	})) {
-		console.log('Current Hostlist Matches Cache');
+		console.log('Current Hosts Matches Cache');
 		getToken();
 	}
 	else {
 		dBody = '{ \"token\": {\"expires\":\"' + d.token.expires + '\","token\":\"' + d.token.token + '\"}, \"hosts\": [' + hosts + '] }';
 		fs.writeFile('./data.json', dBody, function(err) {
 			if(err) {
-				return console.log('Error updating Data: Hosts');
+				return console.log('Error Updating Hosts');
 			}
-			console.log('Hostlist Updated');
+			console.log('Hosts Updated');
 			retrieveToken();
 		});
 	}
@@ -92,7 +98,7 @@ function compareHosts() {
 function retrieveToken() {
 	console.log('Retrieving New Token...');
 	var hardware = {
-	  url: 'https://secure.logmein.com/public-api/v1/inventory/hardware/reports',
+	  url: baseURL + 'inventory/hardware/reports',
 	  headers: {
 		'Content-type': 'application/JSON; charset=utf-8',
 		'Accept': 'application/JSON; charset=utf-8',
@@ -103,17 +109,44 @@ function retrieveToken() {
 	
 	request.post(hardware, function (error, response, body) {
 	  	if(response.statusCode == 201 && !error) {
-				dBody = '{ \"token\": ' + body + ', \"hosts\": [' + hosts + '] }';
-				fs.writeFile('./data.json', dBody, function(err) {
-					if(err) {
-						
-						return console.log('Error updated Data: Token');
-					}
-					return console.log('Token Updated');
-				});
+			hardwareToken = JSON.parse(body).token;
+			dBody = '{ \"token\": ' + body + ', \"hosts\": [' + hosts + '] }';
+			fs.writeFile('./data.json', dBody, function(err) {
+				if(err) {
+					
+					return console.log('Error Saving Token');
+				}
+				console.log('Token Updated');
+				generateReport();
+			});
 		} else if (response.statusCode == 429) {
 			console.log('Cannot generate new token due to high request volume. Wait a few minutes and try again');
 		} else
 			console.log('Error in function \'retrieveToken\', Status Code: ' + response.statusCode);
+	});
+}
+
+function generateReport() {
+	console.log('Generating Hardware Report...');
+	console.log('Hardware Toke is.................' + hardwareToken);
+	var hardware = {
+	  url: baseURL + 'inventory/hardware/reports/' + hardwareToken,
+	  headers: {
+		'Accept': 'application/JSON; charset=utf-8',
+		'Authorization': '{\"companyId\": \"' + cid + '\", \"psk\": \"' + psk + '\"}'
+	  }
+	};
+	
+	request.get(hardware, function (error, response, body) {
+	  	if(response.statusCode == 200 && !error) {
+			fs.writeFile('./hardwareReport.json', body, function(err) {
+				if(err) {
+					return console.log('Error Saving Hardware Report');
+				}
+			});
+		} else if (response.statusCode == 429) {
+			console.log('Cannot generate hardware report due to high request volume. Wait a few minutes and try again');
+		} else
+			console.log('Error in function \'generateReport\', Status Code: ' + response.statusCode);
 	});
 }
