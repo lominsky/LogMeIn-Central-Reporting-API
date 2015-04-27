@@ -4,6 +4,7 @@ var psk = '123456789';
 var request = require('request');
 var fs = require('fs');
 var readline = require('readline');
+var colors = require('colors');
 
 var baseURL = 'https://secure.logmein.com/public-api/v1/';
 
@@ -17,7 +18,7 @@ var systemReports = [];
 getHosts();
 
 function getHosts() {
-	console.log('Getting Current Hosts...');
+	console.log('Getting Current Hosts...'.green);
 	var hosts = {
 	  url: baseURL + 'hosts',
 	  headers: {
@@ -32,15 +33,15 @@ function getHosts() {
 		parseHosts(tempHosts.hosts);
 	  }
 	  else if(response.statusCode == 429) {
-		  console.log('Cannot retrieve host list due to high request volume. Wait a minute and try again.');
+		  console.log('Cannot retrieve host list due to high request volume. Wait a minute and try again.'.red);
 	  }
 	  else
-		  console.log('Error in function \'getHosts\'. Status Code ' + response.statusCode);
+		  console.log('Error in function \'getHosts\'. Status Code '.red + response.statusCode);
 	});
 }
 
 function parseHosts(tempHosts) {
-	console.log('Parsing Host IDs and Names...');
+	console.log('Parsing Host IDs and Names...'.green);
 	var hostCount = tempHosts.length;
 	for(var i = 0; i < hostCount; i++) {
 		hosts.id.push(tempHosts[i].id);
@@ -50,7 +51,7 @@ function parseHosts(tempHosts) {
 }
 
 function retrieveHardwareToken() {
-	console.log('Retrieving New Hardware Token...');
+	console.log('Retrieving New Hardware Token...'.green);
 	var hardware = {
 	  url: baseURL + 'inventory/hardware/reports',
 	  headers: {
@@ -64,18 +65,18 @@ function retrieveHardwareToken() {
 	request.post(hardware, function (error, response, body) {
 	  	if(response.statusCode == 201 && !error) {
 			hardwareToken = JSON.parse(body);
-			console.log('Hardware Report Token Retrieved');
+			console.log('Hardware Report Token Retrieved'.green);
 			generateHardwareReport();
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate new hardware token due to high request volume. Wait a minute and try again');
+			console.log('Cannot generate new hardware token due to high request volume. Wait a minute and try again'.red);
 		} else
-			console.log('Error in function \'retrieveHardwareToken\', Status Code: ' + response.statusCode);
+			console.log('Error in function \'retrieveHardwareToken\', Status Code: '.red + response.statusCode);
 	});
 }
 
 function generateHardwareReport() {
-	console.log('Generating Hardware Report...');
-	console.log('Hardware Token is: ' + hardwareToken.token);
+	console.log('Generating Hardware Report...'.green);
+	console.log('Hardware Token is: '.green + hardwareToken.token);
 	var hardware = {
 	  url: baseURL + 'inventory/hardware/reports/' + hardwareToken.token,
 	  headers: {
@@ -87,18 +88,25 @@ function generateHardwareReport() {
 	request.get(hardware, function (error, response, body) {
 	  	if(response.statusCode == 200 && !error) {
 			hardwareReports.push(JSON.parse(body));
-			console.log('Hardware Report Stored');
-			//console.log(hardwareReport);
-			retrieveSystemToken();
+			console.log('Hardware Report Stored'.green);
+			//printInformation();
+			
+			//Get each additional 50 computers (still needs to be done for Hardware Reports
+			if(JSON.parse(body).report.token == null)
+				retrieveSystemToken();
+			else{
+				hardwareToken = JSON.parse(body).report;
+				generateHardwareReport();
+			}
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate hardware report due to high request volume. Wait a minute and try again');
+			console.log('Cannot generate hardware report due to high request volume. Wait a minute and try again'.red);
 		} else
-			console.log('Error in function \'generateHardwareReport\', Status Code: ' + response.statusCode);
+			console.log('Error in function \'generateHardwaremReport\', Status Code: '.red + response.statusCode);
 	});
 }
 
 function retrieveSystemToken() {
-	console.log('Retrieving New System Token...');
+	console.log('Retrieving New System Token...'.green);
 	var system = {
 	  url: baseURL + 'inventory/system/reports',
 	  headers: {
@@ -112,18 +120,18 @@ function retrieveSystemToken() {
 	request.post(system, function (error, response, body) {
 	  	if(response.statusCode == 201 && !error) {
 			systemToken = JSON.parse(body);
-			console.log('System Report Token Retrieved');
+			console.log('System Report Token Retrieved'.green);
 			generateSystemReport();
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate new system token due to high request volume. Wait a minute and try again');
+			console.log('Cannot generate new system token due to high request volume. Wait a minute and try again'.red);
 		} else
-			console.log('Error in function \'retrieveSystemToken\', Status Code: ' + response.statusCode);
+			console.log('Error in function \'retrieveSystemToken\', Status Code: '.red + response.statusCode);
 	});
 }
 
 function generateSystemReport() {
-	console.log('Generating System Report...');
-	console.log('System Token is: ' + systemToken.token);
+	console.log('Generating System Report...'.green);
+	console.log('System Token is: '.green + systemToken.token);
 	var system = {
 	  url: baseURL + 'inventory/system/reports/' + systemToken.token,
 	  headers: {
@@ -135,7 +143,7 @@ function generateSystemReport() {
 	request.get(system, function (error, response, body) {
 	  	if(response.statusCode == 200 && !error) {
 			systemReports.push(JSON.parse(body));
-			console.log('System Report Stored');
+			console.log('System Report Stored'.green);
 			//printInformation();
 			
 			//Get each additional 50 computers (still needs to be done for Hardware Reports
@@ -146,9 +154,9 @@ function generateSystemReport() {
 				generateSystemReport();
 			}
 		} else if (response.statusCode == 429) {
-			console.log('Cannot generate system report due to high request volume. Wait a minute and try again');
+			console.log('Cannot generate system report due to high request volume. Wait a minute and try again'.red);
 		} else
-			console.log('Error in function \'generateSystemReport\', Status Code: ' + response.statusCode);
+			console.log('Error in function \'generateSystemReport\', Status Code: '.red + response.statusCode);
 	});
 }
 
@@ -177,11 +185,25 @@ function printInformation(compID) {
 	if(index == -1)
 		return userInput();*/
 	//var array = [77998031, '77998031', "77998031"];
-	console.log(parseInt(compID/50));
+	//console.log(parseInt(compID/50));
 	//console.log('Index: ' + compID);
 	//console.log('Host Info: ' + hosts.id[compID] + ', ' + hosts.name[compID]);
 	//console.log('Hardware Report: ' + hardwareReport[compID/50].hosts[hosts.id[compID]]);
-	console.log('System Report: ' + systemReports[parseInt(compID/50)].hosts[hosts.id[compID]].lastLogonUserName);
+	//console.log('System Report: ' + systemReports[parseInt(compID/50)].hosts[hosts.id[compID]].lastLogonUserName);
+	fs.writeFile("userSystemReports.json", JSON.stringify(systemReports[parseInt(compID/50)].hosts[hosts.id[compID]]), function(err) {
+		if(err) {
+			return console.log(err);
+		}
 
-	return userInput();
+		console.log("The System Reports was saved!".blue);
+	}); 
+	fs.writeFile("userHardwareReports.json", JSON.stringify(hardwareReports[parseInt(compID/50)].hosts[hosts.id[compID]]), function(err) {
+		if(err) {
+			return console.log(err);
+		}
+
+		console.log("The Hardware Reports was saved!".blue);
+			
+		return userInput();
+	}); 
 }
